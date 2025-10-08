@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesin Karcis Antrean BPSPL Pontianak</title>
+    <style>
+        /* --- Tampilan Dashboard --- */
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #e6f3ff; padding: 20px; }
+        .container { max-width: 800px; margin: 50px auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); }
+        h1 { color: #004d99; margin-bottom: 30px; }
+        .dashboard { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+        .btn-loket {
+            padding: 20px 15px; font-size: 1.2em; font-weight: bold; color: white; border: none;
+            border-radius: 8px; cursor: pointer; width: 100%; max-width: 350px; box-sizing: border-box;
+            transition: transform 0.2s;
+        }
+        .btn-loket:hover { transform: translateY(-3px); opacity: 0.9; }
+        #btn-pelayanan, #btn-pelayanan2 { background-color: #007bff; }
+        #btn-prioritas { background-color: #ffc107; color: #333; }
+        #btn-ppid { background-color: #28a745; }
+        #btn-pengaduan { background-color: #dc3545; } /* Warna merah */
+
+        /* --- Styling Khusus Pencetakan (Printer Thermal) --- */
+        @media print {
+            body { margin: 0; padding: 0; background-color: white; }
+            .container, .dashboard { display: none; }
+            .karcis-print {
+                display: block !important; width: 58mm; padding: 10px;
+                font-family: 'Consolas', monospace; text-align: center;
+            }
+            .header-logo-container { 
+                display: flex; align-items: center; justify-content: center; margin-bottom: 5px;
+            }
+            .header-logo {
+                width: 40px !important; 
+                height: auto !important;
+                margin-right: 8px !important; 
+            }
+            .header-print { font-size: 0.9em; font-weight: bold; margin: 0; }
+            .alamat-print { font-size: 0.8em; margin-bottom: 10px; }
+            .short-line { font-size: 0.8em; margin: 5px 0; }
+            .nomor-print {
+                font-size: 4em; font-weight: 900; color: #000; margin: 15px 0;
+                padding: 10px 0;
+            }
+            .info-print { font-size: 0.8em; text-align: left; margin-top: 10px; }
+            .footer-survey { font-size: 0.7em; text-align: center; margin-top: 10px; }
+            .qr-code-img { 
+                width: 200px !important; height: auto !important; margin: 10px auto 10px auto !important;
+                display: block !important;
+            }
+            .survey-url { 
+                font-size: 0.7em; margin: 5px 0 10px 0; word-wrap: break-word; 
+            }
+        }
+        .karcis-print { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>BPSPL PONTIANAK: AMBIL NOMOR ANTREAN</h1>
+        <div class="dashboard">
+            <button id="btn-pelayanan" class="btn-loket" data-kode="K">LOKET 1: PELAYANAN UMUM</button>
+            <button id="btn-pelayanan2" class="btn-loket" data-kode="K">LOKET 2: SURAT & DOKUMEN</button>
+            <button id="btn-prioritas" class="btn-loket" data-kode="P">LOKET 3: PRIORITAS (Lansia/Disabilitas)</button>
+            <button id="btn-ppid" class="btn-loket" data-kode="A">LOKET 4: PPID (Informasi Publik)</button>
+            <button id="btn-pengaduan" class="btn-loket" data-kode="G">PENGADUAN</button> <!-- Sudah diganti -->
+        </div>
+    </div>
+
+    <div id="print-area" class="karcis-print">
+        <div class="header-logo-container">
+            <img src="logo.png" alt="Logo KKP" class="header-logo"> 
+            <p class="header-print">BPSPL PONTIANAK</p>
+        </div>
+        <p class="alamat-print">Jl. Husein Hamzah No. 1 Pal Lima</p>
+        <p class="short-line">— — — — — — — — — —</p>
+        <p class="info-print">Layanan: <span id="layanan-print"></span></p>
+        <p class="info-print">Waktu/Tgl: <span id="waktu-print"></span></p>
+        <p class="short-line">— — — — — — — — — —</p>
+        <p>NOMOR ANTREAN</p>
+        <p class="nomor-print" id="nomor-print"></p>
+        <p class="short-line">— — — — — — — — — —</p>
+        <p class="footer-survey">Untuk perbaikan pelayanan kami, silakan isi Survei Kepuasan Masyarakat</p>
+        <p class="footer-survey">(Scan Kode ini)</p>
+        <img src="qr.png" alt="QR Code Survei" class="qr-code-img">
+        <p class="footer-survey" style="margin-top: 5px;">Atau kunjungi:</p>
+        <p class="survey-url">
+            <span id="survey-link">https://ptsp.kkp.go.id/skm/s/u/107</span>
+        </p>
+        <p class="short-line">— — — — — — — — — —</p>
+        <p class="footer-survey" style="font-weight: bold;">Terima kasih sudah mengantri dengan sabar</p>
+    </div>
+
+    <script>
+        const BUTTONS = document.querySelectorAll('.btn-loket');
+        
+        function getNextNumber(kode, layananText) {
+            const dateKey = new Date().toDateString();
+            const storageKey = `antrian_${kode}_${dateKey}`;
+            
+            let currentNumber = parseInt(localStorage.getItem(storageKey)) || 0;
+            const lastDateKey = localStorage.getItem('last_date');
+
+            if (lastDateKey !== dateKey) {
+                 BUTTONS.forEach(btn => {
+                    const k = btn.getAttribute('data-kode');
+                    localStorage.setItem(`antrian_${k}_${dateKey}`, 0);
+                 });
+                 localStorage.setItem('last_date', dateKey);
+                 currentNumber = 0; 
+            }
+            
+            currentNumber++;
+            localStorage.setItem(storageKey, currentNumber);
+
+            return {
+                nomor: kode + String(currentNumber).padStart(3, '0'),
+                layanan: layananText
+            };
+        }
+
+        function handleCetak(event) {
+            const kode = event.target.getAttribute('data-kode');
+            const layananText = event.target.textContent.trim(); 
+            const result = getNextNumber(kode, layananText);
+            
+            const now = new Date();
+            const waktuFormatted = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' / ' + 
+                                   now.toLocaleDateString('id-ID', {day: '2-digit', month: '2-digit', year: 'numeric'});
+
+            document.getElementById('nomor-print').textContent = result.nomor;
+            document.getElementById('layanan-print').textContent = result.layanan;
+            document.getElementById('waktu-print').textContent = waktuFormatted;
+            
+            window.print();
+        }
+
+        BUTTONS.forEach(button => {
+            button.addEventListener('click', handleCetak);
+        });
+
+        const dateKey = new Date().toDateString();
+        const lastDateKey = localStorage.getItem('last_date');
+        if (lastDateKey !== dateKey) {
+             BUTTONS.forEach(btn => {
+                const k = btn.getAttribute('data-kode');
+                localStorage.setItem(`antrian_${k}_${dateKey}`, 0);
+             });
+             localStorage.setItem('last_date', dateKey);
+        }
+    </script>
+</body>
+</html>
